@@ -1,0 +1,2 @@
+-- Scriptly effects receiver placeholder.
+-- Install the complete file from the downloadable package in StarterPlayerScripts.
