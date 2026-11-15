@@ -1,6 +1,5 @@
 -- SCRIPTLY - 628 | GITHUB LOADER
 -- Use only in your own Roblox experience or an experience you are authorised to test.
--- This downloads the client source fragments and joins them before compilation.
 local BASE = "https://raw.githubusercontent.com/shaboomboom43-creator/Scriptly/main/parts/"
 if type(loadstring) ~= "function" then
     warn("[Scriptly 628] loadstring() is unavailable in this executor.")
