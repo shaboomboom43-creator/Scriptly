@@ -58,6 +58,60 @@ access.OnServerInvoke = function(player)
     return isAuthorised(player)
 end
 
+-- The package is installed once in ServerScriptService. The LocalScript
+-- templates live beside this server Script (where they do not execute).
+-- They are cloned into each player's PlayerGui, where LocalScripts run.
+local CLIENT_TEMPLATES = {
+    { templateName = "Six-ScriptlyClientTemplate", runtimeName = "Six-ScriptlyClient" },
+    { templateName = "Six-ScriptlyEffectsTemplate", runtimeName = "Six-ScriptlyEffects" },
+}
+
+local function installClientScripts(player)
+    local playerGui = player:WaitForChild("PlayerGui", 20)
+    if not playerGui then
+        warn("[Six-Scriptly] PlayerGui was not ready for " .. player.Name)
+        return
+    end
+
+    for _, entry in ipairs(CLIENT_TEMPLATES) do
+        local existing = playerGui:FindFirstChild(entry.runtimeName)
+        if existing and existing:IsA("LocalScript") then
+            continue
+        elseif existing then
+            existing:Destroy()
+        end
+
+        local template = script.Parent:FindFirstChild(entry.templateName)
+        if not template or not template:IsA("LocalScript") then
+            warn("[Six-Scriptly] Missing LocalScript template: " .. entry.templateName)
+            continue
+        end
+
+        local clone = template:Clone()
+        clone.Name = entry.runtimeName
+        clone.Parent = playerGui
+    end
+end
+
+local function setupPlayer(player)
+    task.spawn(installClientScripts, player)
+
+    -- PlayerGui can be reset when a character is reloaded. Reinstall the
+    -- client scripts after respawn if Roblox has cleared them.
+    player.CharacterAdded:Connect(function()
+        task.delay(1, function()
+            if player.Parent == Players then
+                installClientScripts(player)
+            end
+        end)
+    end)
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+for _, player in ipairs(Players:GetPlayers()) do
+    setupPlayer(player)
+end
+
 local function characterParts(player)
     local character = player.Character
     if not character then return nil, nil, nil end
@@ -222,4 +276,4 @@ Players.PlayerRemoving:Connect(function(player)
     frozen[player], ghosted[player], ghostTransparency[player], lastCommandAt[player] = nil, nil, nil, nil
 end)
 
-print("[Six-Scriptly] Owner-authorised server controller ready.")
+print("[Six-Scriptly] Universal Studio package ready; client scripts install per player.")
