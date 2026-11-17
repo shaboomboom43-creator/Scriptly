@@ -27,8 +27,7 @@ end
 local playerGui = player:WaitForChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
--- The UI and local anti-cheat test tools must still open when the server bridge
--- has not been installed. Server-only actions are guarded by sendServerCommand.
+-- No client tool starts until the Roblox server confirms owner/developer access.
 local remotes = nil
 local commandEvent = nil
 local accessFunction = nil
@@ -36,12 +35,19 @@ local serverAuthorized = false
 local notifyUser = nil
 
 local function refreshServerLink()
-    remotes = ReplicatedStorage:FindFirstChild("SixScriptlyRemotes")
-    commandEvent = remotes and remotes:FindFirstChild("Command") or nil
-    accessFunction = remotes and remotes:FindFirstChild("CheckAccess") or nil
+    -- Give ServerScriptService time to create its replicated authentication bridge.
+    remotes = ReplicatedStorage:WaitForChild("SixScriptlyRemotes", 15)
+    if not remotes then
+        commandEvent, accessFunction, serverAuthorized = nil, nil, false
+        return false
+    end
+
+    commandEvent = remotes:WaitForChild("Command", 10)
+    accessFunction = remotes:WaitForChild("CheckAccess", 10)
     serverAuthorized = false
 
-    if commandEvent and commandEvent:IsA("RemoteEvent") and accessFunction and accessFunction:IsA("RemoteFunction") then
+    if commandEvent and commandEvent:IsA("RemoteEvent")
+        and accessFunction and accessFunction:IsA("RemoteFunction") then
         local ok, allowed = pcall(function()
             return accessFunction:InvokeServer()
         end)
@@ -159,11 +165,11 @@ local MUTED = Color3.fromRGB(113, 155, 128)
 local ACCENT_A = Color3.fromRGB(0, 255, 125)
 local ACCENT_B = Color3.fromRGB(0, 85, 48)
 
-local previousGui = playerGui:FindFirstChild("SixScriptly628")
+local previousGui = playerGui:FindFirstChild("SixScriptly")
 if previousGui then previousGui:Destroy() end
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "SixScriptly628"
+gui.Name = "SixScriptly"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 900
@@ -894,7 +900,7 @@ local function showAnnouncement(message, by)
 end
 
 notifyUser = function(message)
-    showAnnouncement(message, "SIX-SCRIPTLY 628")
+    showAnnouncement(message, "SIX-SCRIPTLY")
 end
 
 local function showJumpscare(by)
