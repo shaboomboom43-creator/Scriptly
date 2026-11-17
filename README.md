@@ -1,40 +1,41 @@
-# Scriptly - 628
+# Six-Scriptly
 
-Retro green/black Roblox developer testing hub.
+**Six-Scriptly** is an owner-authorised Roblox Studio testing panel. Install it only into experiences you own or are explicitly authorised to test.
 
-## GitHub loader
+## Installation
 
-After making this repository **public**, paste this one-line command into Xeno while in your own experience:
+1. Open your experience in Roblox Studio.
+2. Add `Six-ScriptlyServer.server.lua` as a normal **Script** under `ServerScriptService`.
+3. Add `Six-Scriptly.client.lua` as a **LocalScript** under `StarterPlayer > StarterPlayerScripts`.
+4. Add `Six-ScriptlyEffects.client.lua` as a **LocalScript** under `StarterPlayer > StarterPlayerScripts`.
+5. Publish and test in a private server first.
 
-```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/shaboomboom43-creator/Scriptly/main/ScriptlyLoader.lua"))()
-```
+Six-Scriptly checks server-side authorisation before showing the console. This Studio package has no executor entry point, no loadstring loader and no arbitrary client-supplied Lua execution.
 
-The loader downloads six client source fragments from `parts/`, joins them, compiles the complete client hub, and starts it. The UI no longer exits if `Scriptly628Remotes` is missing.
+## Owner-only access
 
-## Client tools
+- In a user-owned experience, only the Roblox account matching `game.CreatorId` is authorised automatically.
+- In a group-owned experience, add your numeric **Roblox UserId** to `DEVELOPER_IDS` in `Six-ScriptlyServer.server.lua`.
+- The server re-checks access for every command and rate-limits requests.
+- Keep the server controller in `ServerScriptService`; never move it into `ReplicatedStorage` or `StarterPlayer`.
 
-- Full-screen retro loading screen and Scriptly - 628 branding
-- Flight, noclip, bunny hop, spin, local speed and jump tests
-- Player ESP
-- NPC-only ESP and aim test for NPCs tagged `ScriptlyTarget`
-- Fullbright, FOV and flash test
-- Local jumpscare, confetti and announcements
-- Matrix Green, Toxic Lime, Cyber Teal, Amber Terminal and custom gradients
-- RightShift toggles the UI
+A secret stored in a Roblox LocalScript or client-side config cannot be guaranteed private: client code and values can be inspected or copied. Six-Scriptly uses Roblox account identity and a server-side allowlist rather than pretending a client key is device-bound. This restricts use to the authorised Roblox account, but does not prove that account is being used on one physical device only.
 
-## Server tools (one-time Studio setup)
+## Included developer tools
 
-A client loadstring cannot install trusted server code. Install the bundled `ScriptlyServer.server.lua` as a normal Script in `ServerScriptService`. Install `ScriptlyEffects.client.lua` as a LocalScript in `StarterPlayer > StarterPlayerScripts` so all players can render server-wide effects.
+- Owner-only movement and physics test controls
+- Local lighting and camera test controls
+- NPC target ESP and camera tests, restricted to models or parts tagged `SixScriptlyTarget`
+- Server-authoritative heal, respawn, teleport, freeze, ghost, gravity and lighting controls
+- Local/server notifications, confetti and UI effect tests
+- Theme customisation and RightShift panel toggle
 
-The server automatically authorizes the creator only in user-owned experiences. For group-owned experiences, add your own numeric Roblox UserId to `DEVELOPER_IDS` in the server file.
+Player ESP has been removed. Visual highlighting is limited to explicitly tagged NPC test targets.
 
-Server actions include heal, respawn, teleport, freeze/unfreeze, ghost, ForceField, flop, global gravity, day/night, server-wide jumpscare/confetti and announcements.
+## Responsible use
 
-## Important
+Use Six-Scriptly only in experiences you own or have explicit permission to test. Using exploit tools in another creator's experience may violate their rules and can result in account moderation or bans. The in-game warning is informational; server-side owner validation is the actual access control.
 
-- Use only in an experience you own or are authorised to test.
-- Server commands are fixed and validated; arbitrary client-supplied Lua is never executed.
-- Aim assistance is restricted to explicitly tagged NPC test dummies, not player characters.
-- This repository must be public for anonymous `raw.githubusercontent.com` access. Do not put a GitHub token in the loader.
-- Test in a private Studio server first; runtime behaviour has not been verified in your specific place.
+## Repository visibility
+
+The repository was public when this update was prepared. These changes remove executor/loadstring launchers, but source in a public repository remains viewable. Change the repository visibility to **Private** in GitHub repository settings to keep the source private. Do not store a private key, password or API token in client source.
