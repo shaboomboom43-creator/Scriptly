@@ -27,7 +27,11 @@ end
 local playerGui = player:WaitForChild("PlayerGui")
 local camera = workspace.CurrentCamera
 
--- No client tool starts until the Roblox server confirms owner/developer access.
+-- Six-Scriptly is an installable Studio developer panel, not an executor.
+-- The interface always opens. Until the server verifies this experience, it stays
+-- in read-only mode: every action is gated on server authorization and the server
+-- independently checks every command.
+
 local remotes = nil
 local commandEvent = nil
 local accessFunction = nil
@@ -35,15 +39,15 @@ local serverAuthorized = false
 local notifyUser = nil
 
 local function refreshServerLink()
-    -- Give ServerScriptService time to create its replicated authentication bridge.
-    remotes = ReplicatedStorage:WaitForChild("SixScriptlyRemotes", 15)
+    -- Do not stall the UI when the developer server controller is not installed.
+    remotes = ReplicatedStorage:FindFirstChild("SixScriptlyRemotes")
     if not remotes then
         commandEvent, accessFunction, serverAuthorized = nil, nil, false
         return false
     end
 
-    commandEvent = remotes:WaitForChild("Command", 10)
-    accessFunction = remotes:WaitForChild("CheckAccess", 10)
+    commandEvent = remotes:FindFirstChild("Command")
+    accessFunction = remotes:FindFirstChild("CheckAccess")
     serverAuthorized = false
 
     if commandEvent and commandEvent:IsA("RemoteEvent")
@@ -58,79 +62,12 @@ end
 
 refreshServerLink()
 
-local function showAccessLock()
-    local lockGui = Instance.new("ScreenGui")
-    lockGui.Name = "SixScriptlyAccessNotice"
-    lockGui.IgnoreGuiInset = true
-    lockGui.DisplayOrder = 2000
-    lockGui.Parent = playerGui
-    local shade = Instance.new("Frame")
-    shade.Size = UDim2.fromScale(1, 1)
-    shade.BackgroundColor3 = Color3.fromRGB(3, 8, 6)
-    shade.BackgroundTransparency = 0.12
-    shade.BorderSizePixel = 0
-    shade.Parent = lockGui
-    local card = Instance.new("Frame")
-    card.AnchorPoint = Vector2.new(0.5, 0.5)
-    card.Position = UDim2.fromScale(0.5, 0.5)
-    card.Size = UDim2.fromOffset(500, 250)
-    card.BackgroundColor3 = Color3.fromRGB(9, 18, 14)
-    card.BorderSizePixel = 0
-    card.Parent = shade
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = card
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 120, 72)
-    stroke.Thickness = 1.5
-    stroke.Parent = card
-    local heading = Instance.new("TextLabel")
-    heading.BackgroundTransparency = 1
-    heading.Position = UDim2.fromOffset(24, 20)
-    heading.Size = UDim2.new(1, -48, 0, 32)
-    heading.Font = Enum.Font.GothamBold
-    heading.Text = "SIX-SCRIPTLY  /  ACCESS LOCKED"
-    heading.TextColor3 = Color3.fromRGB(0, 255, 145)
-    heading.TextSize = 18
-    heading.TextXAlignment = Enum.TextXAlignment.Left
-    heading.Parent = card
-    local body = Instance.new("TextLabel")
-    body.BackgroundTransparency = 1
-    body.Position = UDim2.fromOffset(24, 66)
-    body.Size = UDim2.new(1, -48, 0, 112)
-    body.Font = Enum.Font.Gotham
-    body.Text = "Only the experience owner or an explicitly allowlisted developer can use Six-Scriptly. Install Six-ScriptlyServer.server.lua in ServerScriptService. Use testing tools only in experiences you own or are authorised to test; unauthorised exploit use can lead to moderation or bans."
-    body.TextColor3 = Color3.fromRGB(190, 210, 198)
-    body.TextSize = 14
-    body.TextWrapped = true
-    body.TextXAlignment = Enum.TextXAlignment.Left
-    body.TextYAlignment = Enum.TextYAlignment.Top
-    body.Parent = card
-    local close = Instance.new("TextButton")
-    close.AnchorPoint = Vector2.new(1, 1)
-    close.Position = UDim2.new(1, -24, 1, -20)
-    close.Size = UDim2.fromOffset(132, 38)
-    close.BackgroundColor3 = Color3.fromRGB(0, 85, 52)
-    close.BorderSizePixel = 0
-    close.Font = Enum.Font.GothamSemibold
-    close.Text = "CLOSE"
-    close.TextColor3 = Color3.fromRGB(235, 255, 242)
-    close.TextSize = 13
-    close.Parent = card
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 8)
-    closeCorner.Parent = close
-    close.MouseButton1Click:Connect(function() lockGui:Destroy() end)
+local function clientFeaturesAllowed()
+    return serverAuthorized
 end
 
 if not serverAuthorized then
-    warn("[Six-Scriptly] Access denied. Owner-only server authorization was not confirmed.")
-    showAccessLock()
-    return
-end
-
-local function clientFeaturesAllowed()
-    return serverAuthorized
+    warn("[Six-Scriptly] Experience not verified. The hub will open in READ-ONLY mode; gameplay actions remain disabled.")
 end
 
 local function sendServerCommand(action, data)
@@ -308,7 +245,7 @@ bootFooter.AnchorPoint = Vector2.new(0.5, 0.5)
 bootFooter.Position = UDim2.fromScale(0.5, 0.94)
 bootFooter.Size = UDim2.new(0.9, 0, 0, 20)
 bootFooter.Font = Enum.Font.Code
-bootFooter.Text = "SIX-SCRIPTLY SYSTEMS  //  OWNER-ONLY BUILD"
+bootFooter.Text = "SIX-SCRIPTLY SYSTEMS  //  STUDIO DEVELOPER BUILD"
 bootFooter.TextColor3 = Color3.fromRGB(71, 106, 83)
 bootFooter.TextSize = 11
 bootFooter.TextXAlignment = Enum.TextXAlignment.Center
@@ -328,7 +265,7 @@ for i = 1, 34 do
 end
 
 local statusMessages = {
-    "CHECKING DEVELOPER ACCESS...",
+    "CHECKING EXPERIENCE PERMISSIONS...",
     "LOADING CLIENT MODULES...",
     "CONNECTING TO SERVER CONTROLLER...",
     "CALIBRATING INTERFACE...",
@@ -376,7 +313,7 @@ local topGradient = addGradient(top, ACCENT_B, Color3.fromRGB(3, 13, 8), 0)
 
 local title = makeLabel(top, "SIX-SCRIPTLY", 21, UDim2.fromOffset(18, 7), Enum.Font.Code, ACCENT_A)
 title.Size = UDim2.new(0.6, 0, 0, 26)
-local subtitle = makeLabel(top, "OWNER-ONLY TEST CONSOLE  |  BUILD 1.0", 10, UDim2.fromOffset(19, 31), Enum.Font.Code, MUTED)
+local subtitle = makeLabel(top, "DEVELOPER QA CONSOLE  |  STUDIO PACKAGE", 10, UDim2.fromOffset(19, 31), Enum.Font.Code, MUTED)
 subtitle.Size = UDim2.new(0.7, 0, 0, 17)
 
 local accessTag = makeLabel(top, "● CHECKING", 10, UDim2.new(1, -228, 0, 18), Enum.Font.Code, ACCENT_A)
@@ -384,8 +321,8 @@ accessTag.Size = UDim2.fromOffset(178, 22)
 accessTag.TextXAlignment = Enum.TextXAlignment.Right
 
 local function updateServerStatusBadge()
-    accessTag.Text = serverAuthorized and "● OWNER VERIFIED" or "● ACCESS LOCKED"
-    accessTag.TextColor3 = serverAuthorized and ACCENT_A or Color3.fromRGB(255, 100, 100)
+    accessTag.Text = serverAuthorized and "● SERVER VERIFIED" or "● READ-ONLY MODE"
+    accessTag.TextColor3 = serverAuthorized and ACCENT_A or Color3.fromRGB(255, 190, 80)
 end
 updateServerStatusBadge()
 accessTag.TextXAlignment = Enum.TextXAlignment.Right
@@ -431,7 +368,7 @@ contentLayout.Padding = UDim.new(0, 8)
 contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
 contentLayout.Parent = content
 
-local footer = makeLabel(main, "SIX-SCRIPTLY  //  RIGHT SHIFT: TOGGLE HUB  //  STUDIO DEV BUILD", 10, UDim2.new(0, 15, 1, -28), Enum.Font.Code, MUTED)
+local footer = makeLabel(main, "SIX-SCRIPTLY  //  RIGHT SHIFT: TOGGLE HUB  //  READ-ONLY IF UNVERIFIED", 10, UDim2.new(0, 15, 1, -28), Enum.Font.Code, MUTED)
 footer.Size = UDim2.new(1, -30, 0, 17)
 
 local activeTab = "MOVEMENT"
@@ -1211,11 +1148,11 @@ warningCard.ZIndex = 301
 warningCard.Parent = warningOverlay
 addCorner(warningCard, 12)
 addStroke(warningCard, ACCENT_B, 0.08, 1.5)
-local warningTitle = makeLabel(warningCard, "AUTHORISED TESTING ONLY", 18, UDim2.fromOffset(24, 22), Enum.Font.GothamBold, ACCENT_A)
+local warningTitle = makeLabel(warningCard, "DEVELOPER TESTING NOTICE", 18, UDim2.fromOffset(24, 22), Enum.Font.GothamBold, ACCENT_A)
 warningTitle.Size = UDim2.new(1, -48, 0, 30)
 warningTitle.ZIndex = 302
 local warningBody = makeLabel(warningCard,
-    "Six-Scriptly is an owner-only developer testing suite. Use it only in experiences you own or have explicit permission to test. Running exploit tools in other experiences may violate their rules and can result in moderation or bans.",
+    "Use Six-Scriptly only in experiences you own or have explicit permission to test. The hub opens without a personal key. When the server cannot verify this experience, the panel remains READ-ONLY and gameplay-changing commands are disabled. In your own games, install the server controller and authorize your Roblox account in its settings.",
     14, UDim2.fromOffset(24, 68), Enum.Font.Gotham, TEXT)
 warningBody.Size = UDim2.new(1, -48, 0, 112)
 warningBody.TextWrapped = true
