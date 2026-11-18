@@ -1,14 +1,24 @@
--- SCRIPTLY - 628 | SERVER CONTROLLER
--- Install as a normal Script in ServerScriptService.
--- For group-owned games, add your own numeric UserId to DEVELOPER_IDS.
+-- SCRIPTLY - 628 | SERVER CONTROLLER  (build 6.28.1)
+-- Install as a normal Script in ServerScriptService. Works in any experience you own.
+--
+-- Who is allowed to use it (checked on the server, never trusted from the client):
+--   1. Anyone, while running inside Roblox Studio.
+--   2. The owner of a user-owned experience.
+--   3. Any UserId listed in DEVELOPER_IDS.
+--   4. Group members at or above MIN_GROUP_RANK, for a group-owned experience
+--      (or for GROUP_ID, if you set it - handy for a studio group that owns several games).
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local Debris = game:GetService("Debris")
+local RunService = game:GetService("RunService")
 
 local DEVELOPER_IDS = {
-    [123456789] = true, -- REPLACE with your own UserId for group-owned games.
+    -- [1234567] = true,   -- add your studio's developer UserIds here
 }
+local GROUP_ID = 0          -- 0 = use the group that owns this experience (if it is group-owned)
+local MIN_GROUP_RANK = 255  -- 255 = group owner only. Lower it (e.g. 200) to let your dev ranks in.
+local MAX_COMMANDS_PER_SECOND = 12
 local DEFAULT_GRAVITY = workspace.Gravity
 local DEFAULT_CLOCK_TIME = Lighting.ClockTime
 local frozen = {}
@@ -25,11 +35,38 @@ local access = folder:FindFirstChild("CheckAccess") or Instance.new("RemoteFunct
 access.Name = "CheckAccess"
 access.Parent = folder
 
+local rankCache = {}   -- [userId] = { rank = number, at = os.clock() }
+
+local function groupRank(player)
+    local groupId = GROUP_ID
+    if groupId == 0 and game.CreatorType == Enum.CreatorType.Group then groupId = game.CreatorId end
+    if groupId == 0 then return 0 end
+    local cached = rankCache[player.UserId]
+    if cached and os.clock() - cached.at < 60 then return cached.rank end
+    local ok, rank = pcall(function() return player:GetRankInGroup(groupId) end)
+    rank = ok and tonumber(rank) or 0
+    rankCache[player.UserId] = { rank = rank, at = os.clock() }
+    return rank
+end
+
 local function allowed(player)
+    if RunService:IsStudio() then return true end
     if DEVELOPER_IDS[player.UserId] == true then return true end
-    return game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId
+    if game.CreatorType == Enum.CreatorType.User and player.UserId == game.CreatorId then return true end
+    return groupRank(player) >= MIN_GROUP_RANK
 end
 access.OnServerInvoke = allowed
+
+-- Simple per-player rate limit so a client cannot flood the controller.
+local buckets = {}
+local function withinRate(player)
+    local now = os.clock()
+    local b = buckets[player] or { start = now, count = 0 }
+    if now - b.start >= 1 then b.start, b.count = now, 0 end
+    b.count = b.count + 1
+    buckets[player] = b
+    return b.count <= MAX_COMMANDS_PER_SECOND
+end
 
 local function characterParts(player)
     local char = player.Character
@@ -90,6 +127,7 @@ local function findPlayer(name)
 end
 
 command.OnServerEvent:Connect(function(player,action,data)
+    if not withinRate(player) then return end
     if not allowed(player) then
         warn("[Scriptly 628] Rejected unauthorised command from "..player.Name)
         return
@@ -163,5 +201,6 @@ end)
 
 Players.PlayerRemoving:Connect(function(p)
     frozen[p]=nil; ghosted[p]=nil; ghostTransparency[p]=nil
+    buckets[p]=nil; rankCache[p.UserId]=nil
 end)
 print("[Scriptly 628] Server controller ready.")

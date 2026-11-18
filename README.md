@@ -1,40 +1,55 @@
-# Scriptly - 628
+# SCRIPTLY // 628
 
-Retro green/black Roblox developer testing hub.
+Retro-cyber developer console for testing your own Roblox experiences: movement and physics tools, ESP, NPC targeting tests, lighting and camera overrides, plus server-authoritative developer actions.
 
-## GitHub loader
+## Quick start (executor)
 
-After making this repository **public**, paste this one-line command into Xeno while in your own experience:
+With the repository **public**, run this one line while inside your own experience:
 
 ```lua
 loadstring(game:HttpGet("https://raw.githubusercontent.com/shaboomboom43-creator/Scriptly/main/ScriptlyLoader.lua"))()
 ```
 
-The loader downloads six client source fragments from `parts/`, joins them, compiles the complete client hub, and starts it. The UI no longer exits if `Scriptly628Remotes` is missing.
+The loader downloads `ScriptlyClient.lua` (a single file), compiles it and starts it. It works with executors that offer `game:HttpGet` or any of the common `request` functions, and with `loadstring` or `load`. Running it again replaces the previous copy instead of stacking up.
 
-## Client tools
+Prefer not to use GitHub at runtime? Paste the contents of `ScriptlyClient.lua` straight into your executor, or drop it into `StarterPlayer > StarterPlayerScripts` as a LocalScript.
 
-- Full-screen retro loading screen and Scriptly - 628 branding
-- Flight, noclip, bunny hop, spin, local speed and jump tests
-- Player ESP
-- NPC-only ESP and aim test for NPCs tagged `ScriptlyTarget`
-- Fullbright, FOV and flash test
-- Local jumpscare, confetti and announcements
-- Matrix Green, Toxic Lime, Cyber Teal, Amber Terminal and custom gradients
-- RightShift toggles the UI
+## Studio setup (for the server tools and for every player to see effects)
 
-## Server tools (one-time Studio setup)
+| File | Where it goes | Purpose |
+| --- | --- | --- |
+| `ScriptlyServer.server.lua` | `ServerScriptService` (Script) | Validates and runs the server-side actions |
+| `ScriptlyEffects.client.lua` | `StarterPlayer > StarterPlayerScripts` (LocalScript) | Shows server-wide announcements, jumpscares and confetti to every player |
 
-A client loadstring cannot install trusted server code. Install the bundled `ScriptlyServer.server.lua` as a normal Script in `ServerScriptService`. Install `ScriptlyEffects.client.lua` as a LocalScript in `StarterPlayer > StarterPlayerScripts` so all players can render server-wide effects.
+The hub works without these (client mode); the SERVER tab and server-wide effects need them.
 
-The server automatically authorizes the creator only in user-owned experiences. For group-owned experiences, add your own numeric Roblox UserId to `DEVELOPER_IDS` in the server file.
+### Who can use it
 
-Server actions include heal, respawn, teleport, freeze/unfreeze, ghost, ForceField, flop, global gravity, day/night, server-wide jumpscare/confetti and announcements.
+Access is decided on the server, never trusted from the client:
 
-## Important
+1. Anyone running inside Roblox Studio.
+2. The owner of a user-owned experience.
+3. Any UserId listed in `DEVELOPER_IDS` (top of `ScriptlyServer.server.lua`).
+4. For studio / group-owned experiences: group members at or above `MIN_GROUP_RANK`. Set `GROUP_ID` if your studio group owns several games, or leave it at `0` to use the group that owns the experience. The default rank is 255 (group owner only); lower it to let your developer ranks in.
 
-- Use only in an experience you own or are authorised to test.
-- Server commands are fixed and validated; arbitrary client-supplied Lua is never executed.
-- Aim assistance is restricted to explicitly tagged NPC test dummies, not player characters.
-- This repository must be public for anonymous `raw.githubusercontent.com` access. Do not put a GitHub token in the loader.
-- Test in a private Studio server first; runtime behaviour has not been verified in your specific place.
+## Interface
+
+- Synthwave boot sequence (click or press any key to skip), CRT scanlines, animated gradient border, glitch title
+- Draggable window that scales to any screen size, with a launcher button to bring it back (touch friendly)
+- Toggles, sliders, toast notifications and a live FPS / ping / player readout
+- `RightShift` hides and shows the hub
+- Six colour presets (Neon Grid default, Synthwave, Matrix Green, Toxic Lime, Cyber Teal, Amber Terminal) plus a custom hex gradient
+
+## Tools
+
+- **Movement:** flight (keyboard, thumbstick and on-screen buttons) with a speed slider, noclip, bunny hop, spin, walk speed and jump power sliders, anti-cheat simulation presets
+- **Visuals:** player ESP, NPC target ESP, NPC aim test, fullbright, FOV slider, flash test
+- **Server:** heal, teleport to spawn, respawn, freeze, ghost, ForceField, flop, teleport to player
+- **World + fun:** local jumpscare / confetti / announcement; server-wide gravity, day / night, jumpscare, confetti and announcements
+
+## Safety and scope
+
+- For experiences you own or are authorised to test. Use a private Studio server first.
+- Server commands are a fixed, validated list and are rate-limited; arbitrary client-supplied Lua is never executed.
+- Aim assist only targets parts and models tagged `ScriptlyTarget` (use the CollectionService tag editor on your test dummies), never player characters.
+- The repository must be public for anonymous `raw.githubusercontent.com` access. Never put a GitHub token in the loader.
