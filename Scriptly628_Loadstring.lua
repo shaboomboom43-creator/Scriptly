@@ -1,2 +1,6 @@
--- Paste this one line into your executor (repository must be public):
-loadstring(game:HttpGet("https://raw.githubusercontent.com/shaboomboom43-creator/Scriptly/main/ScriptlyLoader.lua"))()
+-- SCRIPTLY // 628 — ARCHIVED SHUTDOWN
+-- This project has been intentionally disabled.
+-- No UI, tools, network calls, remotes, or gameplay actions are started.
+
+warn("[SCRIPTLY 628] UNAVAILABLE — this project is archived and disabled.")
+return
