@@ -35,8 +35,80 @@ local playerGui = player:WaitForChild("PlayerGui")
 local previousGui = playerGui:FindFirstChild("Scriptly628")
 if previousGui then previousGui:Destroy() end
 
+
+-- Private passphrase gate. Only the SHA-256 digest is stored in this public file.
+-- This is a casual-use lock, not a tamper-proof security boundary.
+local ACCESS_KEY_SHA256 = "c939ab83806c4e4621414cd8317feec70bbec4eacf099bfca08435948cec6d7e"
+local KEY_MOD = 4294967296
+local SHA256_K = {
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+}
+
+local function privateKeyDigest(message)
+    local bit = bit32
+    if not bit then return nil end
+    local H = {
+        0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+        0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19,
+    }
+    local bitLength = #message * 8
+    local highLength = math.floor(bitLength / KEY_MOD)
+    local lowLength = bitLength % KEY_MOD
+    message = message .. string.char(0x80)
+    message = message .. string.rep("\0", (56 - (#message % 64)) % 64)
+    local function be32(value)
+        return string.char(
+            math.floor(value / 16777216) % 256,
+            math.floor(value / 65536) % 256,
+            math.floor(value / 256) % 256,
+            value % 256
+        )
+    end
+    message = message .. be32(highLength) .. be32(lowLength)
+
+    for offset = 1, #message, 64 do
+        local w = {}
+        for i = 0, 15 do
+            local a,b,c,d = string.byte(message, offset + i*4, offset + i*4 + 3)
+            w[i] = ((a*256 + b)*256 + c)*256 + d
+        end
+        for i = 16, 63 do
+            local x = w[i-15]
+            local y = w[i-2]
+            local s0 = bit.bxor(bit.rrotate(x,7), bit.rrotate(x,18), bit.rshift(x,3))
+            local s1 = bit.bxor(bit.rrotate(y,17), bit.rrotate(y,19), bit.rshift(y,10))
+            w[i] = (w[i-16] + s0 + w[i-7] + s1) % KEY_MOD
+        end
+
+        local a,b,c,d,e,f,g,h = H[1],H[2],H[3],H[4],H[5],H[6],H[7],H[8]
+        for i = 0, 63 do
+            local sum1 = bit.bxor(bit.rrotate(e,6), bit.rrotate(e,11), bit.rrotate(e,25))
+            local choose = bit.bxor(bit.band(e,f), bit.band(bit.bnot(e),g))
+            local t1 = (h + sum1 + choose + SHA256_K[i+1] + w[i]) % KEY_MOD
+            local sum0 = bit.bxor(bit.rrotate(a,2), bit.rrotate(a,13), bit.rrotate(a,22))
+            local majority = bit.bxor(bit.band(a,b), bit.band(a,c), bit.band(b,c))
+            local t2 = (sum0 + majority) % KEY_MOD
+            h,g,f,e,d,c,b,a = g,f,e,(d+t1)%KEY_MOD,c,b,a,(t1+t2)%KEY_MOD
+        end
+        H[1]=(H[1]+a)%KEY_MOD; H[2]=(H[2]+b)%KEY_MOD
+        H[3]=(H[3]+c)%KEY_MOD; H[4]=(H[4]+d)%KEY_MOD
+        H[5]=(H[5]+e)%KEY_MOD; H[6]=(H[6]+f)%KEY_MOD
+        H[7]=(H[7]+g)%KEY_MOD; H[8]=(H[8]+h)%KEY_MOD
+    end
+
+    return string.format("%08x%08x%08x%08x%08x%08x%08x%08x",
+        H[1],H[2],H[3],H[4],H[5],H[6],H[7],H[8])
+end
+
 local CFG = {
-    VERSION = "6.28.1",
+    VERSION = "6.28.2",
     REMOTES = "Scriptly628Remotes",
     TAG = "ScriptlyTarget",
     TOGGLE_KEY = Enum.KeyCode.RightShift,
@@ -87,8 +159,10 @@ local function refreshLink()
 end
 
 -- Local tools: experience owner / Studio, or a developer the server has confirmed.
+local keyVerified = false
+
 local function allowed()
-    return userOwns or link.authorized
+    return keyVerified and (userOwns or link.authorized)
 end
 
 -- ---------------------------------------------------------------------------
@@ -426,6 +500,10 @@ end
 
 -- Fixed, validated server actions only.
 local function sendServer(action, data)
+    if not keyVerified then
+        toast("Enter your private Scriptly key first.", "bad", "KEY REQUIRED")
+        return false
+    end
     if not link.command or not link.authorized then
         toast("Server link offline. Install ScriptlyServer.server.lua in ServerScriptService.", "warn", "SERVER OFFLINE")
         task.spawn(function()
@@ -446,8 +524,12 @@ local function sendServer(action, data)
 end
 
 local function gate()
-    if allowed() then return true end
-    toast("Scriptly tools are restricted to the experience owner and authorised developer testers.", "bad", "ACCESS DENIED")
+    if not keyVerified then
+        toast("Paste your private key to unlock Scriptly.", "bad", "KEY REQUIRED")
+        return false
+    end
+    if userOwns or link.authorized then return true end
+    toast("Scriptly is limited to experiences you own or are authorised to test.", "bad", "ACCESS DENIED")
     return false
 end
 
@@ -1871,9 +1953,142 @@ pcall(function()
     if type(_G) == "table" then _G.Scriptly628_Cleanup = cleanup end
 end)
 
+
+-- ---------------------------------------------------------------------------
+--  Private key prompt
+-- ---------------------------------------------------------------------------
+local function promptPrivateKey()
+    local completed = Instance.new("BindableEvent")
+    local overlay = Instance.new("Frame")
+    overlay.Name = "ScriptlyPrivateKeyPrompt"
+    overlay.Size = UDim2.fromScale(1, 1)
+    overlay.BackgroundColor3 = Color3.fromRGB(3, 4, 12)
+    overlay.BackgroundTransparency = 0.08
+    overlay.BorderSizePixel = 0
+    overlay.Active = true
+    overlay.ZIndex = 1000
+    overlay.Parent = gui
+
+    local card = Instance.new("Frame")
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.Position = UDim2.fromScale(0.5, 0.5)
+    card.Size = UDim2.fromOffset(470, 260)
+    card.BackgroundColor3 = Color3.fromRGB(10, 12, 27)
+    card.BorderSizePixel = 0
+    card.ZIndex = 1001
+    card.Parent = overlay
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = card
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 240, 255)
+    stroke.Thickness = 1.5
+    stroke.Parent = card
+
+    local function label(text, position, size, color, textSize)
+        local item = Instance.new("TextLabel")
+        item.BackgroundTransparency = 1
+        item.Position = position
+        item.Size = size
+        item.Font = Enum.Font.Code
+        item.Text = text
+        item.TextColor3 = color
+        item.TextSize = textSize
+        item.TextWrapped = true
+        item.ZIndex = 1002
+        item.Parent = card
+        return item
+    end
+
+    label("SCRIPTLY // PRIVATE ACCESS", UDim2.fromOffset(24, 24), UDim2.new(1, -48, 0, 30),
+        Color3.fromRGB(0, 240, 255), 20)
+    label("Paste the key from Scriptly_Private_Access_Key.txt to continue.",
+        UDim2.fromOffset(24, 64), UDim2.new(1, -48, 0, 38), Color3.fromRGB(190, 198, 225), 12)
+
+    local box = Instance.new("TextBox")
+    box.Position = UDim2.fromOffset(24, 116)
+    box.Size = UDim2.new(1, -48, 0, 42)
+    box.BackgroundColor3 = Color3.fromRGB(4, 6, 17)
+    box.BorderSizePixel = 0
+    box.Font = Enum.Font.Code
+    box.TextSize = 13
+    box.TextColor3 = Color3.fromRGB(235, 240, 255)
+    box.PlaceholderColor3 = Color3.fromRGB(100, 112, 150)
+    box.PlaceholderText = "Paste your 64-character access key"
+    box.ClearTextOnFocus = false
+    box.Text = ""
+    box.ZIndex = 1003
+    box.Parent = card
+    local boxCorner = Instance.new("UICorner")
+    boxCorner.CornerRadius = UDim.new(0, 5)
+    boxCorner.Parent = box
+    local boxStroke = Instance.new("UIStroke")
+    boxStroke.Color = Color3.fromRGB(38, 48, 88)
+    boxStroke.Parent = box
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.Parent = box
+
+    local status = label("KEY REQUIRED", UDim2.fromOffset(24, 166), UDim2.new(1, -48, 0, 22),
+        Color3.fromRGB(255, 196, 64), 12)
+    status.TextXAlignment = Enum.TextXAlignment.Center
+
+    local button = Instance.new("TextButton")
+    button.Position = UDim2.fromOffset(24, 198)
+    button.Size = UDim2.new(1, -48, 0, 38)
+    button.BackgroundColor3 = Color3.fromRGB(0, 80, 95)
+    button.BorderSizePixel = 0
+    button.Font = Enum.Font.Code
+    button.Text = "UNLOCK SCRIPTLY"
+    button.TextColor3 = Color3.fromRGB(235, 250, 255)
+    button.TextSize = 14
+    button.ZIndex = 1003
+    button.Parent = card
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 5)
+    buttonCorner.Parent = button
+
+    local submitted = false
+    local function submit()
+        if submitted then return end
+        local entered = string.gsub(box.Text or "", "%s+", "")
+        local digest = privateKeyDigest(entered)
+        if digest == ACCESS_KEY_SHA256 then
+            submitted = true
+            keyVerified = true
+            status.Text = "ACCESS GRANTED"
+            status.TextColor3 = Color3.fromRGB(60, 255, 150)
+            button.Text = "UNLOCKED"
+            task.delay(0.35, function()
+                if overlay.Parent then overlay:Destroy() end
+                completed:Fire()
+            end)
+        else
+            status.Text = "INVALID KEY  //  TRY AGAIN"
+            status.TextColor3 = Color3.fromRGB(255, 72, 104)
+            box.Text = ""
+            box:CaptureFocus()
+        end
+    end
+    button.MouseButton1Click:Connect(submit)
+    box.FocusLost:Connect(function(enterPressed)
+        if enterPressed then submit() end
+    end)
+    task.defer(function()
+        if box.Parent then box:CaptureFocus() end
+    end)
+
+    completed.Event:Wait()
+    completed:Destroy()
+end
+
 -- ---------------------------------------------------------------------------
 --  Go
 -- ---------------------------------------------------------------------------
+-- Verify the private key before initializing the console.
+promptPrivateKey()
+
 -- Resolve the server link in the background while the boot screen plays.
 task.spawn(function()
     refreshLink()
