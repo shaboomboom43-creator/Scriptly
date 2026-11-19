@@ -12,6 +12,8 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/shaboomboom43-creator
 
 The loader downloads `ScriptlyClient.lua` (a single file), compiles it and starts it. It works with executors that offer `game:HttpGet` or any of the common `request` functions, and with `loadstring` or `load`. Running it again replaces the previous copy instead of stacking up.
 
+On startup, Scriptly asks for the private key stored in your separate `Scriptly_Private_Access_Key.txt` file. Keep that file private and do not commit it to GitHub. The prompt is a client-side convenience lock only: because this repository is public and the client runs on the user's machine, it is not tamper-proof. The existing server-side experience/developer authorization remains in place for server commands.
+
 Prefer not to use GitHub at runtime? Paste the contents of `ScriptlyClient.lua` straight into your executor, or drop it into `StarterPlayer > StarterPlayerScripts` as a LocalScript.
 
 ## Studio setup (for the server tools and for every player to see effects)
